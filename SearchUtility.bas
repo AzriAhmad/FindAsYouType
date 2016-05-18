@@ -1,6 +1,6 @@
 'Source: http://allenbrowne.com
 'Adapted from: http://allenbrowne.com
-'Modified By: Azri AR
+'Modified By: Azri AR | GitHub: AzriAhmad
 'Date:        May, 2016
 'Author:      Allen Browne. allen@allenbrowne.com
 'Date:        August, 2006.
@@ -12,7 +12,7 @@
 '              3. Set the form's On Load property to: [Event Procedure]
 '              4. Click the Build button beside the form's On Load property. Access opens the code window.
 '              5. In the code window, between the "Private Sub Form_Load" and "End Sub" lines, enter this:
-'                      Call FindAsUTypeLoad(Me, [MatchMode])
+'                      Call FindAsUTypeLoad(Me,)
 'Documentation: http://allenbrowne.com/AppFindAsUType.html
 Option Compare Database
 Option Explicit
@@ -48,9 +48,9 @@ If gcvHandleError Then On Error GoTo Err_Handler
 'Note:          The form must contain the 2 controls, cboFindAsUTypeField and txtFindAsUTypeValue,
 '                   with the combo set up correctly.
 'Usage:         Set the Load event procedure of the form to:
-'                   Call FindAsUType(Me, [MatchMode]))
+'                   Call FindAsUType(Me)
 '               To suppress filtering on controls FirstName and City, use:
-'                   Call FindAsUType(Me, [MatchMode], "FirstName", "City")
+'                   Call FindAsUType(Me, "FirstName", "City")
     Dim rs As DAO.Recordset                 'Clone set of the form.
     Dim ctl As Control                      'Each control on the form.
     Dim strForm As String                   'Name of form (for error handler.)
@@ -184,6 +184,7 @@ If gcvHandleError Then On Error GoTo Err_Handler
     Dim strText As String      'The text of the text box.
     Dim lngSelStart As Long    'Selection Starting point.
     Dim i As Long
+    Dim strMultText            'For searchAll
     Dim strField As String     'Name of the field to filter on.
     Dim bHasFocus As Boolean   'True if the text box has focus (since it can be called from the combo too.)
     Const strcTextBox = "txtFindAsUTypeValue"
@@ -207,21 +208,17 @@ If gcvHandleError Then On Error GoTo Err_Handler
     
     'Read the filter field name from the combo.
     strField = Nz(frm.cboFindAsUTypeField.Column(micFilterField), vbNullString)
-
+        
     'Unfilter if there is no text to find, or no control to filter. Otherwise, filter.
     If (strText = vbNullString) Or (strField = vbNullString) Then
         frm.FilterOn = False
-    ElseIf mbSearchAll Then
-        For i = 0 To frm.cboFindAsUTypeField.ListCount - 1
-            Debug.Print frm.cboFindAsUTypeField.Column(micFilterField, i)
-        Next i
     Else
-        'Build the filter
+        'Identify matchmode
         '0 - Any Part               Like *string*
         '1 - Start of Field         Like string*
         '2 - End of Field           Like *string
         '3 - Whole Field            Like string
-       
+        
         'First wildcard
         If (miMatchMode = 0 Or miMatchMode = 2) Then
             smartWildCardA = mstrcWildcardChar
@@ -231,12 +228,25 @@ If gcvHandleError Then On Error GoTo Err_Handler
         If (miMatchMode = 0 Or miMatchMode = 1) Then
             smartWildCardB = mstrcWildcardChar
         End If
+    
+         'Build the filter
+
+        If mbSearchAll Then
+            For i = 0 To frm.cboFindAsUTypeField.ListCount - 1
+                strField = Nz(frm.cboFindAsUTypeField.Column(micFilterField, i), vbNullString)
+                
+                strMultText = strMultText + strField & " Like """ + smartWildCardA & _
+                    strText + smartWildCardB & """ OR "
+            Next i
+            strMultText = Left(strMultText, Len(strMultText) - 3)
+            frm.Filter = strMultText
+        Else
+            'Here we leverage the math operator "+" to dynamically print the wildcards aka "smart"
+            frm.Filter = strField & " Like """ + smartWildCardA & _
+            strText + smartWildCardB & """"
+        End If
         
-        'Here we leverage the math operator "+" to dynamically print the wildcards aka "smart"
-        frm.Filter = strField & " Like """ + smartWildCardA & _
-        strText + smartWildCardB & """"
-        
-        Debug.Print frm.Filter
+        'Debug.Print frm.Filter
         frm.FilterOn = True
     End If
 
