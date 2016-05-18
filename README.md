@@ -6,8 +6,8 @@ Adapted from: http://allenbrowne.com
 
 Disclaimer
 ---
-This code has been taken and modified from http://allenbrowne.com/AppFindAsUTypeCode.html
-User this code at your risk and be sure to read the original author's documentation http://allenbrowne.com/AppFindAsUType.html. 
+This code has been taken and modified from http://allenbrowne.com/AppFindAsUTypeCode.html.
+Use it at your own risk and be sure to read the original author's documentation at http://allenbrowne.com/AppFindAsUType.html. 
 
 
 Enhancements
