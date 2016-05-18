@@ -10,7 +10,7 @@ This code has been taken and modified from http://allenbrowne.com/AppFindAsUType
 User this code at your risk and be sure to read the original author's documentation http://allenbrowne.com/AppFindAsUType.html. 
 
 
-Enhancement
+Enhancements
 ---
 * Extend the original functionallity to allow for searching through all fields in the form.
 
