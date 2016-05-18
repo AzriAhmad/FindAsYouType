@@ -1,3 +1,7 @@
+'Source: http://allenbrowne.com
+'Adapted from: http://allenbrowne.com
+'Modified By: Azri AR
+'Date:        May, 2016
 'Author:      Allen Browne. allen@allenbrowne.com
 'Date:        August, 2006.
 'Limitations: Combos where the bound column is hidden have these limitations:
@@ -8,13 +12,13 @@
 '              3. Set the form's On Load property to: [Event Procedure]
 '              4. Click the Build button beside the form's On Load property. Access opens the code window.
 '              5. In the code window, between the "Private Sub Form_Load" and "End Sub" lines, enter this:
-'                      Call FindAsUTypeLoad(Me)
+'                      Call FindAsUTypeLoad(Me, [MatchMode])
 'Documentation: http://allenbrowne.com/AppFindAsUType.html
 Option Compare Database
 Option Explicit
 
 'Configuration options
-Private Const mbcStartOfField = False   'True to match only the start of the field; False for anywhere in field.
+'Private Const mbcStartOfField = False   'True to match only the start of the field; False for anywhere in field.
 Private Const mstrcWildcardChar = "*"   'Pattern matching wildcard. "*" for Access. "%" for SQL Server.
 Private Const mstrcSep = ";"            'Separator between list items. May need changing for some regional settings.
 
@@ -29,10 +33,14 @@ Private Const micFieldType = 4
 Private Const mlngcOnTheForm = -1&
 
 'Module name (for error handler.)
-Private Const conMod = "ajbFindAsUType"
+Private Const conMod = "SearchUtility"
+
+'Store user configuration for the form
+Private miMatchMode As Integer
+Private mbSearchAll As Boolean
 
 Public Function FindAsUTypeLoad(frm As Form, ParamArray avarExceptionList()) As Boolean
-On Error GoTo Err_Handler
+If gcvHandleError Then On Error GoTo Err_Handler
 'Purpose:       Initialize the code for Find.
 'Return:        True on success.
 'Arguments:     - frm = a reference to the form where you want this filtering.
@@ -40,9 +48,9 @@ On Error GoTo Err_Handler
 'Note:          The form must contain the 2 controls, cboFindAsUTypeField and txtFindAsUTypeValue,
 '                   with the combo set up correctly.
 'Usage:         Set the Load event procedure of the form to:
-'                   Call FindAsUType(Me)
+'                   Call FindAsUType(Me, [MatchMode]))
 '               To suppress filtering on controls FirstName and City, use:
-'                   Call FindAsUType(Me, "FirstName", "City")
+'                   Call FindAsUType(Me, [MatchMode], "FirstName", "City")
     Dim rs As DAO.Recordset                 'Clone set of the form.
     Dim ctl As Control                      'Each control on the form.
     Dim strForm As String                   'Name of form (for error handler.)
@@ -59,6 +67,7 @@ On Error GoTo Err_Handler
     Dim astrControls() As String            'Array to handle the controls on the form.
     Const lngcControl = 0&                  'First element of array astrControls is the control name.
     Const lngcField = 1&                    'Second element of the array is the field name to filter on.
+
 
     'The form must have a control source if we are to filter it, and needs our 3 controls.
     strForm = frm.Name
@@ -168,16 +177,20 @@ Err_Handler:
 End Function
 
 Public Function FindAsUTypeChange(frm As Form) As Boolean
-On Error GoTo Err_Handler
+If gcvHandleError Then On Error GoTo Err_Handler
     'Purpose:   Filter the form, by the control named in cboFindAsUTypeField and the value in txtFindAsUTypeValue.
     'Return:    True unless an error occurred.
     'Usage:     The code assigns this to the Change event of the text box, and the AfterUpdate event of the combo.
     Dim strText As String      'The text of the text box.
     Dim lngSelStart As Long    'Selection Starting point.
+    Dim i As Long
     Dim strField As String     'Name of the field to filter on.
     Dim bHasFocus As Boolean   'True if the text box has focus (since it can be called from the combo too.)
     Const strcTextBox = "txtFindAsUTypeValue"
 
+    Dim smartWildCardA As Variant    'Not ideal but faster than multiple IIFs
+    Dim smartWildCardB As Variant
+    
     'If the text box has focus, remember the selection insert point and use its Text. Otherwise use its Value.
     bHasFocus = (frm.ActiveControl.Name = strcTextBox)
     If bHasFocus Then
@@ -191,16 +204,39 @@ On Error GoTo Err_Handler
     If frm.Dirty Then
         frm.Dirty = False
     End If
-
+    
     'Read the filter field name from the combo.
     strField = Nz(frm.cboFindAsUTypeField.Column(micFilterField), vbNullString)
 
     'Unfilter if there is no text to find, or no control to filter. Otherwise, filter.
     If (strText = vbNullString) Or (strField = vbNullString) Then
         frm.FilterOn = False
+    ElseIf mbSearchAll Then
+        For i = 0 To frm.cboFindAsUTypeField.ListCount - 1
+            Debug.Print frm.cboFindAsUTypeField.Column(micFilterField, i)
+        Next i
     Else
-        frm.Filter = strField & " Like """ & IIf(mbcStartOfField, vbNullString, mstrcWildcardChar) & _
-        strText & mstrcWildcardChar & """"
+        'Build the filter
+        '0 - Any Part               Like *string*
+        '1 - Start of Field         Like string*
+        '2 - End of Field           Like *string
+        '3 - Whole Field            Like string
+       
+        'First wildcard
+        If (miMatchMode = 0 Or miMatchMode = 2) Then
+            smartWildCardA = mstrcWildcardChar
+        End If
+        
+        'Second wildcard
+        If (miMatchMode = 0 Or miMatchMode = 1) Then
+            smartWildCardB = mstrcWildcardChar
+        End If
+        
+        'Here we leverage the math operator "+" to dynamically print the wildcards aka "smart"
+        frm.Filter = strField & " Like """ + smartWildCardA & _
+        strText + smartWildCardB & """"
+        
+        Debug.Print frm.Filter
         frm.FilterOn = True
     End If
 
@@ -234,7 +270,7 @@ Err_Handler:
 End Function
 
 Private Function Caption4Control(frm As Form, ctl As Control) As String
-On Error GoTo Err_Handler
+If gcvHandleError Then On Error GoTo Err_Handler
     'Purpose: Choose the name by which the user knows this control.
     Dim strCaption As String
 
@@ -279,7 +315,7 @@ Err_Handler:
 End Function
 
 Private Function CaptionFromHeader(frm As Form, ctl As Control) As String
-On Error GoTo Err_Handler
+If gcvHandleError Then On Error GoTo Err_Handler
     'Purpose:   Look for a label in the column header, directly over the control, in continuous form view.
     'Return:    Caption of the label if found.
     Dim ctlHeader As Control    'controls in the header of the form.
@@ -309,7 +345,7 @@ Err_Handler:
 End Function
 
 Private Function HasUnboundControls(frm As Form, ParamArray avarControlNames()) As Boolean
-On Error GoTo Err_Handler
+If gcvHandleError Then On Error GoTo Err_Handler
     'Purpose: Return true if all the controls named in the array are present on the form, and are unbound.
     Dim lngI As Long
     Dim bCancel As Boolean
@@ -334,7 +370,7 @@ Err_Handler:
 End Function
 
 Private Function MaxParentNumber(frm As Form) As Long
-On Error GoTo Err_Handler
+If gcvHandleError Then On Error GoTo Err_Handler
     'Purpose:   Return the PageIndex of the tab page that the control is on.
     'Return:    -1 if setting directly on the form, else the PageIndex of the last page of the tab control.
     'Note:      PageIndex is zero based, so subtract 1 from the count of pages.
@@ -386,7 +422,7 @@ On Error Resume Next
 End Function
 
 Private Function GetFilterField(ctl As Control) As String
-On Error GoTo Err_Handler
+If gcvHandleError Then On Error GoTo Err_Handler
     'Purpose:   Determine the field name to use when filtering on this control.
     'Return:    The field name the control is bound to, except for combos.
     '               In Access 2002 and later, we return the syntax Access uses for filtering these controls.
@@ -444,7 +480,7 @@ Err_Handler:
 End Function
 
 Private Function FirstVisibleColumn(cbo As ComboBox) As Integer
-On Error GoTo Err_Handler
+If gcvHandleError Then On Error GoTo Err_Handler
     'Purpose:   Return the column number of the first visible column in a combo.
     'Return:    Column number. ZERO-BASED!
     'Argument:  The combo to examine.
@@ -487,11 +523,16 @@ Err_Handler:
     Resume Exit_Handler
 End Function
 
+'Mutator to change user preferences
+Public Sub ConfigMutator(Optional piMatchMode As Integer, Optional pbSearchAll As Boolean)
+    miMatchMode = piMatchMode
+    mbSearchAll = pbSearchAll
+End Sub
 '------------------------------------------------------------------------------------------------
 'You may prefer to replace this with a true error logger. See http://allenbrowne.com/ser-23a.html
 Private Function LogError(ByVal lngErrNumber As Long, ByVal strErrDescription As String, _
     strCallingProc As String, Optional vParameters, Optional bShowUser As Boolean = True) As Boolean
-On Error GoTo Err_LogError
+If gcvHandleError Then On Error GoTo Err_LogError
     'Purpose:   Generic error handler.
     'Arguments: lngErrNumber - value of Err.Number
     '           strErrDescription - value of Err.Description
@@ -534,73 +575,3 @@ Err_LogError:
     Resume Exit_LogError
 End Function
 
-'------------------------------------------------------------------------------------------------
-'Replace() and Split() are needed for Access 97 only. Leave them commented out for later versions.
-'------------------------------------------------------------------------------------------------
-'Private Function Replace(strExpr As String, strFind As String, strReplace As String, Optional lngStart As Long = 1) As String
-'    Dim strOut As String
-'    Dim lngLenExpr As Long
-'    Dim lngLenFind As Long
-'    Dim lng As Long
-'
-'    lngLenExpr = Len(strExpr)
-'    lngLenFind = Len(strFind)
-'
-'    If (lngLenExpr > 0&) And (lngLenFind > 0&) And (lngLenExpr >= lngStart) Then
-'        lng = lngStart
-'        If lng > 1 Then
-'            strOut = Left$(strExpr, lng - 1&)
-'        End If
-'        Do While lng <= lngLenExpr
-'            If Mid(strExpr, lng, lngLenFind) = strFind Then
-'                strOut = strOut & strReplace
-'                lng = lng + lngLenFind
-'            Else
-'                strOut = strOut & Mid(strExpr, lng, 1&)
-'                lng = lng + 1
-'            End If
-'        Loop
-'        Replace = strOut
-'    End If
-'
-'End Function
-'
-'Private Function Split(strIn As String, strDelim As String) As Variant
-'    'Purpose: Return a variant array from the items in the string, delimited the 2nd argument.
-'    Dim varArray As Variant   'Variant array for output.
-'    Dim lngStart As Long      'Position in string where argument starts.
-'    Dim lngEnd As Long        'Position in string where argument ends.
-'    Dim lngLenDelim As Long   'Length of the delimiter string.
-'    Dim i As Integer          'index to the array.
-'
-'    lngLenDelim = Len(strDelim)
-'    If (lngLenDelim = 0&) Or (Len(strIn) = 0&) Then
-'        ReDim varArray(0)     'Initialize a zero-item array.
-'    Else
-'        ReDim varArray(9)     'Initialize a 10 item array.
-'        i = -1                'First item will be zero when we add 1.
-'        lngStart = 1          'Start searching at first character of string.
-'
-'        'Search for the delimiter in the input string, until not found any more.
-'        Do
-'            i = i + 1
-'            If i > UBound(varArray) Then    'Add more items if necessary
-'                ReDim Preserve varArray(UBound(varArray) + 10)
-'            End If
-'
-'            lngEnd = InStr(lngStart, strIn, strDelim)
-'            If lngEnd = 0 Then  'This is the last item.
-'                varArray(i) = Trim(Mid(strIn, lngStart))
-'                Exit Do
-'            Else
-'                varArray(i) = Trim(Mid(strIn, lngStart, lngEnd - lngStart))
-'                lngStart = lngEnd + lngLenDelim
-'            End If
-'        Loop
-'        'Set the upper bound of the array to the correct number of items.
-'        ReDim Preserve varArray(i)
-'    End If
-'
-'    Split = varArray
-'End Function
-'------------------------------------------------------------------------------------------------
