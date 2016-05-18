@@ -1,5 +1,5 @@
 
-# FindAsYouType
+# FindAsYouType for Your Legacy App UX
 
 Adapted from: http://allenbrowne.com
 
