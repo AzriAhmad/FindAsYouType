@@ -15,10 +15,11 @@ Enhancement
 * Extend the original functionallity to allow for searching through all fields in the form.
 
 * Add more 'MatchModes' for search string:
-'0 - Any Part				Like *string*
-'1 - Start of Field			Like string*	
-'2 - End of Field 			Like *string
-'3 - Whole Field			Like string
+
+		'0 - Any Part				Like *string*
+		'1 - Start of Field			Like string*	
+		'2 - End of Field 			Like *string
+		'3 - Whole Field			Like string
 
 
 * Allow user the ability to dynamically change configurations from the UI
