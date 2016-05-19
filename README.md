@@ -29,3 +29,4 @@ Enhancements
 Usage
 ---
 TBD
+Example: https://github.com/AzriAhmad/FindAsYouType/releases
