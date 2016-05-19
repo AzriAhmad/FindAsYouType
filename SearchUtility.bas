@@ -17,6 +17,10 @@
 Option Compare Database
 Option Explicit
 
+'Global constant variables
+'Value for enable/disable error handlers; Set to true in Production
+Public Const gcvHandleError = True
+
 'Configuration options
 'Private Const mbcStartOfField = False   'True to match only the start of the field; False for anywhere in field.
 Private Const mstrcWildcardChar = "*"   'Pattern matching wildcard. "*" for Access. "%" for SQL Server.
